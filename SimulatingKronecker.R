@@ -189,7 +189,7 @@ for (i in 1:numdays){
 }
 #####################################################################################################
 # marginal variance
-margvar = 1
+margvar = 2
 # nugget for spatial dimension
 nugget =.01
 # nugget for the temporal dimension
@@ -258,14 +258,36 @@ InvSSmat = diag(1/(margvar*as.vector(outer(Sr, Sc)) + nugget))
 zreshape = matrix(mySim, nrow=k, ncol=p)
 dim(zreshape)
 
-res1 = InvSSmat %*% as.vector(solve(Ur) %*% zreshape %*% solve(t(Uc)))
+#res1 = InvSSmat %*% as.vector(solve(Ur) %*% zreshape %*% solve(t(Uc)))
 res1 = InvSSmat %*% as.vector(solve(Ur) %*% zreshape %*% Uc)
 
 
 resmat = matrix(res1, nrow = k, ncol = p)
 
-dim(t(C%*%solve(Uc_t)))
-PostMeanTest = as.vector(G%*%solve(Ur_t) %*% resmat %*% t(C%*%solve(Uc_t)))
-testing = as.vector(G %*% Ur %*% resmat %*% Uc_t %*% t(C) ) # equivalent to above but simpler
+PostMeanTest = margvar * as.vector(G%*%solve(Ur_t) %*% resmat %*% t(C%*%solve(Uc_t)))
+testing = margvar * as.vector(G %*% Ur %*% resmat %*% Uc_t %*% t(C) ) # equivalent to above but simpler
 
+head(postmeantruth)
+head(PostMeanTest)
+################################################################################################
+# if we do sigmaT kronecker sigmaN instead, like Dave does in his example
+################################################################################################
+margvar=1
+KronCovmat = margvar * kronecker(SigmaN, SigmaT) + diag(nugget, nrow = p*k, ncol = p*k) 
+mySim = rmultnorm(1, rep(0, p*k), KronCovmat)
+postmeantruth = as.vector(margvar*kronecker(SigGN, SigmaT) %*% solve(KronCovmat) %*% t(mySim))
+dim(kronecker(SigGN, SigmaT))
+dim(KronCovmat)
+#inverse of kronecker of singular values of C and R
+InvSSmat = diag(1/(margvar*as.vector(outer(Sc, Sr)) + nugget))
+
+#reshape z to be p x k
+zreshape = matrix(mySim, nrow=p, ncol=k)
+
+#750x750 x vector(150x150 %*% 150x5 %*% 5x5)
+res1 = InvSSmat %*% as.vector(solve(Uc) %*% zreshape %*% Ur)
+
+resmat = matrix(res1, nrow = p, ncol = k)
+
+result = margvar * as.vector(C %*% Uc %*% resmat %*% Ur_t %*% t(G) ) 
 

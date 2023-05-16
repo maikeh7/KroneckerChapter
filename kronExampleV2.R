@@ -173,11 +173,89 @@ fkr2 = fkr / sqrt(svvec)
 sum(fkr2^2)
 }; toc()
 
+##############################################################################
+## Maike added this -- result for post cond mean
+# Dave, you can check
+##############################################################################
+
+# function to generate MVN realizations (using svd decomposition, not cholesky!)
+rmultnorm <- function(n,mu,sigma){
+  # returns n rows of multinormal mu, sigma random vectors
+  # ie: returns a n x length(mu) matrix
+  p <- length(mu)
+  z <- matrix(rnorm(n * p),nrow=n)
+  # ch <- chol(sigma,pivot=T)
+  svdsig <- svd(sigma)
+  ch <- sqrt(diag(svdsig$d)) %*% t(svdsig$u)  
+  #piv <- attr(ch,"pivot")
+  #zz <- (z%*%ch)
+  zz <- z %*% ch
+  #zzz <- 0*zz
+  #zzz[,piv] <- zz
+  zz + matrix(mu,nrow=n,ncol=p,byrow=T)
+}
 
 
+n1 = 11; n2 = 10        # good for plots
+#n1 = 11*4; n2 = 10*4    # good for timing
+t1=seq(0,1,length=n1)
+x1=seq(0,1,length=n2)
+x=expand.grid(t1,x1)
+Covt = covpow(cbind(t1,0),scale=1)
+Covx = covpow(cbind(0,x1),scale=1)
+CovKr = kronecker(Covx,Covt)
 
+pow=2
+scale=1
+nstar = 15
+xstar = seq(0,1, length = nstar)
+distmat = abs(outer(xstar, x1, "-"))
+# build cross cov mat
+Cov_xstar_x = exp(-(distmat/scale)^pow) #nstar x n1
 
+# rename stuff otherwise I get confused
+C = Covt
+R = Covx
+G = Cov_xstar_x
 
+#svd C and R
+svdC = svd(C)
+svdR = svd(R)
 
+Uc = svdC$u
+Sc = svdC$d
+Uc_t = t(svdC$v)
 
+Ur = svdR$u
+Sr = svdR$d
+Ur_t = t(svdR$v)
+
+# This is the very slow way of getting post conditional mean
+p=nrow(C)
+k=nrow(R)
+
+# get conditional mean the fast way
+margvar=1
+# but first the slow way so we can check!
+
+Cnug = 1e-6
+KronCovmat = margvar * kronecker(Covx, Covt) + diag(Cnug, nrow = p*k, ncol = p*k) 
+mySim = rmultnorm(1, rep(0, p*k), KronCovmat)
+
+# this is the slow way
+postmeantruth = as.vector(margvar*kronecker(Cov_xstar_x, Covt) %*% solve(KronCovmat) %*% t(mySim))
+
+#inverse of kronecker of singular values of C and R
+InvSSmat = diag(1/(margvar*as.vector(outer(Sc, Sr)) + Cnug))
+
+#reshape z to be p x k
+zreshape = matrix(mySim, nrow=p, ncol=k)
+
+res1 = InvSSmat %*% as.vector(solve(Uc) %*% zreshape %*% Ur)
+
+resmat = matrix(res1, nrow = p, ncol = k)
+
+result = margvar * as.vector(C %*% Uc %*% resmat %*% Ur_t %*% t(G) ) 
+# check if correct
+all.equal(postmeantruth, result)
 
