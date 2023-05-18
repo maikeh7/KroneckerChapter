@@ -210,17 +210,21 @@ scale=1
 nstar = 15
 xstar = seq(0,1, length = nstar)
 distmat = abs(outer(xstar, x1, "-"))
+distmat2 = abs(outer(x1, xstar, "-"))
+distmat3 = abs(outer(xstar, xstar, "-"))
 # build cross cov mat
 Cov_xstar_x = exp(-(distmat/scale)^pow) #nstar x n1
+Cov_x_xstar = exp(-(distmat2/scale)^pow)
 
+Cov_xstar_xstar = exp(- (distmat3/scale)^pow)
 # rename stuff otherwise I get confused
 C = Covt
 R = Covx
-G = Cov_xstar_x
 
 #svd C and R
 svdC = svd(C)
 svdR = svd(R)
+svdG = svd(G)
 
 Uc = svdC$u
 Sc = svdC$d
@@ -258,4 +262,37 @@ resmat = matrix(res1, nrow = p, ncol = k)
 result = margvar * as.vector(C %*% Uc %*% resmat %*% Ur_t %*% t(G) ) 
 # check if correct
 all.equal(postmeantruth, result)
+
+# deal w/ covariance
+C = Covx
+R = Covt
+#svd C and R
+svdC = svd(C)
+svdR = svd(R)
+svdG = svd(G)
+
+Uc = svdC$u
+Sc = svdC$d
+Uc_t = t(svdC$v)
+
+Ur = svdR$u
+Sr = svdR$d
+Ur_t = t(svdR$v)
+
+Sig11 = kronecker(Covx, Covt) + diag(Cnug, nrow = p*k, ncol = p*k) 
+Sig12 = kronecker(Cov_x_xstar, Covt)
+Sig21 = kronecker(Cov_xstar_x, Covt)
+Sig22 = kronecker(Cov_xstar_xstar, Covt)
+True_cond_cov = Sig22 - Sig21 %*% solve(Sig11) %*% Sig12
+truth = Sig21 %*% solve(Sig11) %*% Sig12
+X = diag(1/(margvar*as.vector(outer(Sr, Sc)) + Cnug))
+
+Sig11_inv_truth = solve(Sig11)
+
+Sig11_inv = kronecker(Uc, Ur) %*% X %*% solve(kronecker(Uc, Ur))
+
+# this is not exactly the same as truth but I think that's bc of rounding error...hopefully
+# I can't reduce this, so maybe we can work with this?
+# can't cholesky decompose RHS or LHS! issue w/ positive definiteness
+test1 = Sig22 - Sig21 %*% Sig11_inv %*% kronecker(t(G), R)
 
