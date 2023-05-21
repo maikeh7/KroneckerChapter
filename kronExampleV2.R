@@ -294,5 +294,8 @@ Sig11_inv = kronecker(Uc, Ur) %*% X %*% solve(kronecker(Uc, Ur))
 # this is not exactly the same as truth but I think that's bc of rounding error...hopefully
 # I can't reduce this, so maybe we can work with this?
 # can't cholesky decompose RHS or LHS! issue w/ positive definiteness
+# this really isn't any faster
+# we will have to simulate using Nychka's method 
 test1 = Sig22 - Sig21 %*% Sig11_inv %*% kronecker(t(G), R)
+
 

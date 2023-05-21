@@ -1,13 +1,15 @@
+#####################################################################
+### estimating parameters!
+#####################################################################
+# see Find_scale_params() below
+# I found that functions from dfoptim worked better than from optim
+library(dfoptim)
 Fast_kronecker_quadratic=function(C, R, Uc, Sc, Uc_t, Ur, Sr, Ur_t, z, nugget, marginal_variance){
-  p=nrow(C)
-  k=nrow(R)
+  p = nrow(C)
+  k = nrow(R)
   Zmat = matrix(z, nrow = k, ncol = p)
+  # could be faster using Dave's solve()...
   Myvec = as.vector(Ur_t %*% Zmat %*% Uc) 
-  
-  # Scmin = min(Sc)
-  # 
-  # Srmin = min(Sr)
-  # print(c(Scmin, Srmin))
   
   eigenvals = marginal_variance * as.vector((outer(Sr, Sc))) + nugget #ok this works for sure
   
@@ -21,17 +23,18 @@ Fast_kronecker_quadratic=function(C, R, Uc, Sc, Uc_t, Ur, Sr, Ur_t, z, nugget, m
 }
 
 
-LogLik_MVN <- function(C, R, Uc, Sc, Uc_t, Ur, Sr, Ur_t, z, nugget, marginal_variance, Temporal_nugget) {
-  p=nrow(C) #temporal
-  k=nrow(R) #spatial
+LogLik_MVN <- function(C, R, Uc, Sc, Uc_t, Ur, Sr, Ur_t, z, nugget, marginal_variance) {
+  p = nrow(C) 
+  k = nrow(R) 
   n = p*k #total length of z vec
   
-  #calculates the quadratic term
+  # calculates the quadratic term
   kronResult = Fast_kronecker_quadratic(C, R, Uc, Sc, Uc_t, Ur, Sr, Ur_t, z, nugget, marginal_variance) 
   ssqKronecker = kronResult$quadratic 
   
   LogDet = kronResult$LogDet
-  #return log likelihood
+  
+  # return log likelihood
   loglike = - .5*LogDet -n/2*log(2 *pi) - .5*ssqKronecker
   
   #SigSquared = 1000000
@@ -43,26 +46,22 @@ LogLik_MVN <- function(C, R, Uc, Sc, Uc_t, Ur, Sr, Ur_t, z, nugget, marginal_var
   return(loglike)
 }
 
+# distC and distR are distance matrices
+# z is response
+# parameters are ... parameters!
+# this function assumes you want kronecker(C, R), NOT kronecker(R, C)
 Find_scale_params = function(parameters, distC, distR, z){
-  P = 365
-  #P= 55
-  ell = parameters[1]
-  #ell = 1.043448
-  #scaleR = parameters[2]
-  scaleR = 120
-  nugget = parameters[2]
-  marginal_variance = parameters[3]
-  Temporal_nugget = parameters[4]
+  # parameters we want to estimate
+  scaleC = parameters[1]
+  scaleR = parameters[2]
+  nugget = parameters[3]
+  marginal_variance = parameters[4]
   
+  #calculate eigendecomp of C and R 
+  C = exp(-(distC / scaleC)^2) 
+  R = exp(-(distR / scaleR)^2) 
   
-  #calculate eigendecomp of C (temporal ) and R (spatial) correlation matrices
-  C = exp(-2*ell^2 * (sin(pi * distC/P))^2 ) + diag(Temporal_nugget, nrow = nrow(distC), ncol = ncol(distC))
-  #Cmin = matrix(min(C), nrow = nrow(C), ncol = ncol(C))
-  #C2 = C - Cmin
-  #C3 = C2 / max(C2)
-  #C=C3 + diag(Temporal_nugget, nrow = nrow(distC), ncol = ncol(distC))
-  
-  
+  # do svd (eigen) decomp of both cov mats
   svdC = svd(C)
   Uc = svdC$u
   Sc = svdC$d
@@ -74,34 +73,19 @@ Find_scale_params = function(parameters, distC, distR, z){
   Sr = svdR$d
   Ur_t = t(svdR$v)
   
-  MylogLik = LogLik_MVN(C, R, Uc, Sc, Uc_t, Ur, Sr, Ur_t, z, nugget, marginal_variance, Temporal_nugget)
+  MylogLik = LogLik_MVN(C, R, Uc, Sc, Uc_t, Ur, Sr, Ur_t, z, nugget, marginal_variance)
   # print(MylogLik)
   return(-MylogLik) #return negative log likelihood
 }
 
-.26^2
-nugget=.1
-marginal_variance=.01
-dmvnorm(x=z, mean = rep(0, nrow(SigGGT)), sigma = SigGGT, log = T)
+# starting parameters goes first, then name of function to optimize
+# distC = distance matrix for C
+# distR = distnace matrix for R
+# z is response vector
+# lower =  lower bounds
+# upper = upper bounds
+# nelder mead method
+testmkb = nmkb(c(0.5, .5, .01, .01), Find_scale_params,distC = distC, distR=distR, z=z,
+               lower = c(0.1, 0.1, 0.000001, .001), upper = c(1, 1, 1, 2))
+#dmvnorm(x=z, mean = rep(0, nrow(SigGGT)), sigma = SigGGT, log = T)
 #######################################################################################################
-dim(distC)
-length(z)
-range(distC)
-range(distR)
-distC = sigmaT
-distR = SigmaNN
-z = monthAves$MeanResid
-z = monthAves$MeanTMAXwhite
-
-#try dfoptim --nelder mead method (this works better than optim)
-#this converges and doesn't give an error message
-library(dfoptim)
-# ell = parameters[1]
-# scaleR = parameters[2]
-# nugget = parameters[3]
-# marginal_variance = parameters[4]
-# Temporal_nugget = parameters[5]
-
-#0.672604743 47.258957106  0.007379727  0.999999993  0.013868505
-testmkb = nmkb(c(900, .0001, .0001, .0001), Find_scale_params,distC = distC, distR=distR, z=z,
-               lower = c(10, 0.00001, 0.00001, .00001), upper = c(1000, .1, .1, .1))
