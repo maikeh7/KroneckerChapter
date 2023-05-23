@@ -3,6 +3,7 @@
 # make the 2-d x support
 n1 = 11; n2 = 10        # good for plots
 #n1 = 11*4; n2 = 10*4    # good for timing
+n1 = 33; n2 = 30 
 t1=seq(0,1,length=n1)
 x1=seq(0,1,length=n2)
 x=expand.grid(t1,x1)
