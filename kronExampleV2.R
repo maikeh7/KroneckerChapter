@@ -221,6 +221,7 @@ Cov_xstar_xstar = exp(- (distmat3/scale)^pow)
 # rename stuff otherwise I get confused
 C = Covt
 R = Covx
+G = Cov_xstar_x
 
 #svd C and R
 svdC = svd(C)
@@ -267,6 +268,7 @@ all.equal(postmeantruth, result)
 # deal w/ covariance
 C = Covx
 R = Covt
+
 #svd C and R
 svdC = svd(C)
 svdR = svd(R)

@@ -1,164 +1,114 @@
-#####################################################################
-### estimating parameters!
-#####################################################################
-# see Find_scale_params() below
-# I found that functions from dfoptim worked better than from optim
-# this is for kronecker(C, R), not the other way around!
-# starting parameters goes first, then name of function to optimize
-# distC = distance matrix for C
-# distR = distnace matrix for R
-# z is response vector
-# lower =  lower bounds
-# upper = upper bounds
-# nelder mead method
-
-library(dfoptim)
-Fast_kronecker_quadratic=function(C, R, Uc, Sc, Uc_t, Ur, Sr, Ur_t, z, nugget, marginal_variance){
-  p = nrow(C)
-  k = nrow(R)
-  Zmat = matrix(z, nrow = k, ncol = p)
-  # could be faster using Dave's solve()...
-  Myvec = as.vector(Ur_t %*% Zmat %*% Uc) 
-  
-  eigenvals = marginal_variance * as.vector((outer(Sr, Sc))) + nugget #ok this works for sure
-  
-  
-  InvEigenMat = diag((1 / eigenvals), nrow = p*k, ncol = p*k)
-  
-  ssqKronecker = (t(Myvec) %*% InvEigenMat %*% Myvec) 
-  LogDet = sum(log(eigenvals)) 
-  
-  return(list(quadratic = ssqKronecker, LogDet = LogDet))
-}
-
-
-LogLik_MVN <- function(C, R, Uc, Sc, Uc_t, Ur, Sr, Ur_t, z, nugget, marginal_variance) {
-  p = nrow(C) 
-  k = nrow(R) 
-  n = p*k #total length of z vec
-  
-  # calculates the quadratic term
-  kronResult = Fast_kronecker_quadratic(C, R, Uc, Sc, Uc_t, Ur, Sr, Ur_t, z, nugget, marginal_variance) 
-  ssqKronecker = kronResult$quadratic 
-  
-  LogDet = kronResult$LogDet
-  
-  # return log likelihood
-  loglike = - .5*LogDet -n/2*log(2 *pi) - .5*ssqKronecker
-
-  return(loglike)
-}
-
-# distC and distR are distance matrices
-# z is response
-# parameters are ... parameters!
-# this function assumes you want kronecker(C, R), NOT kronecker(R, C)
-Estimate_params = function(parameters, distC, distR, z){
-  # parameters we want to estimate
-  scaleC = parameters[1]
-  scaleR = parameters[2]
-  nugget = parameters[3]
-  marginal_variance = parameters[4]
-  
-  #calculate eigendecomp of C and R 
-  C = exp(-(distC / scaleC)^2) 
-  R = exp(-(distR / scaleR)^2) 
-  
-  # do svd (eigen) decomp of both cov mats
-  svdC = svd(C)
-  Uc = svdC$u
-  Sc = svdC$d
-  Uc_t = t(svdC$v)
-  
-  R = exp(-(distR / scaleR)^2) 
-  svdR = svd(R)
-  Ur = svdR$u
-  Sr = svdR$d
-  Ur_t = t(svdR$v)
-  
-  MylogLik = LogLik_MVN(C, R, Uc, Sc, Uc_t, Ur, Sr, Ur_t, z, nugget, marginal_variance)
-  # print(MylogLik)
-  return(-MylogLik) #return negative log likelihood
-}
-
-# a function to make the Gaussian covariance matrix
-covpow <- function(locs,pow=2,scale=5){
-  # browser()
-  d1 <- dist(locs)
-  n <- dim(locs)[1]
-  mat <- matrix(0,n,n)
-  mat[lower.tri(mat)] <- d1
-  mat <- mat+t(mat)
-  cc <- exp(-(mat/scale)^pow)
-  return(cc)
-}
-
-make_distmat = function(locs){
-  d1 <- dist(locs)
-  n <- dim(locs)[1]
-  mat <- matrix(0,n,n)
-  mat[lower.tri(mat)] <- d1
-  mat <- mat+t(mat)
-  return(mat)
-}
-
+source("Cov_functions.R")
+source("Estimation_1D.R")
 ############
 # Example 1
 ############
-# try estimating using our deterministic fucntion f
-# this does not work so well...
-n1 = 55; n2 = 50
-t1=seq(0,1,length=n1)
-x1=seq(0,1,length=n2)
+# Estimating params using our deterministic fucntion f
+nt = 20; nx = 11
+t1=seq(0,1,length=nt)
+x1=seq(0,1,length=nx)
 x=expand.grid(t1,x1)
 
+
 # a deterministic function to be emulated
-# adding noise seems to help estimation
 f = (x[,2]+1)*cos(pi*x[,1]) + rnorm(nrow(x), sd= 0.0001)
 
 # C = x
 # R = t
 Tdist = make_distmat(cbind(t1,0))
 Xdist = make_distmat(cbind(0, x1))
-persp(t1,x1,matrix(f,nrow=n1),theta = 130-90, phi = 10,xlab='t',ylab='x',zlab='f',zlim=c(-3,3)) -> res
+persp(t1,x1,matrix(f,nrow=nt),theta = 130-90, phi = 10,xlab='t',ylab='x',zlab='f',zlim=c(-3,3)) -> res
 points(trans3d(x[,1], x[,2], f, pmat = res), col = 'black', pch = 16,cex=.7)
 
-testmkb = nmkb(c(0.5, .5, .001, 1), Estimate_params, distC = Xdist, distR = Tdist, z=f,
-               lower = c(0.1, 0.1, 0.00000001, .5), upper = c(50, 10, 1, 5))
-# HMMMMMM.....not sure these make much sense....
+testmkb = nmkb(c(0.5, .5, .0001, .5), Estimate_params, distC = Xdist, distR = Tdist, z=f,
+               lower = c(0.1, 0.1, 1e-8, .1), upper = c(100, 100, 100, 100))
 testmkb
+# HMMMMMM.....not sure these make much sense....but conditional mean below looks ok.
+params= testmkb$par
+# scaleC           ScaleR      Nugget      Marginal var
+# 100.00000000   0.56668151   0.00000001  99.99999787
+scaleX = params[1]
+scalet = params[2]
+Cnug = params[3]
+margvar = params[4]
+scalet=.1
+Covt = covpow(cbind(t1,0),scale= scalet)
+Covx = covpow(cbind(0,x1),scale= scaleX)
+CovKr = kronecker(Covx,Covt) # so we can check results later
+
+nt = 20; nstar = 25
+# prediction grid for x
+xstar = seq(0,1, length = nstar)
+xstar_grid = expand.grid(t1, xstar)
+# make distance matrices
+distmat_xstar_x = abs(outer(xstar, x1, "-"))
+distmat_x_xstar = abs(outer(x1, xstar, "-"))
+distmat_xstar_xstar = abs(outer(xstar, xstar, "-"))
+
+# build cross covariance matrices
+Cov_xstar_x = exp(-(distmat_xstar_x/scaleX)^pow) 
+Cov_x_xstar = exp(-(distmat_x_xstar/scaleX)^pow)
+Cov_xstar_xstar = exp(- (distmat_xstar_xstar/scaleX)^pow)
+
+# svd/eigen decomps of covx = C and Covt = R
+R = Covt
+C = Covx
+G = Cov_xstar_x
+
+#svd C and R
+svdC = svd(C)
+svdR = svd(R)
+svdG = svd(G)
+
+Uc = svdC$u
+Sc = svdC$d
+Uc_t = t(svdC$v)
+
+Ur = svdR$u
+Sr = svdR$d
+Ur_t = t(svdR$v)
+
+# This is the very slow way of getting post conditional mean
+p = nrow(C) 
+k = nrow(R) 
+
+KronCovmat = margvar * kronecker(Covx, Covt) + diag(Cnug, nrow = p*k, ncol = p*k) 
+#mySim = rmultnorm(1, rep(0, p*k), KronCovmat)
+
+# this is the slow way
+postmeantruth = as.vector(margvar*kronecker(Cov_xstar_x, Covt) %*% solve(KronCovmat) %*% f)
+
+# inverse of kronecker of singular values of C and R
+# equivalent to kronecker(Sc, Sr)! but faster obviously
+InvSSmat = diag(1/(margvar*as.vector(outer(Sr, Sc)) + Cnug))
+
+# reshape z to be kxp
+zreshape = matrix(mySim, nrow=k, ncol=p)
+
+#res1 = InvSSmat %*% as.vector(solve(Uc) %*% zreshape %*% Ur)
+res1 = InvSSmat %*% as.vector(solve(Ur) %*% zreshape %*% Uc)
+
+#resmat = matrix(res1, nrow = p, ncol = k)
+resmat = matrix(res1, nrow=k, ncol=p)
+
+#result = margvar * as.vector(C %*% Uc %*% resmat %*% Ur_t %*% t(G) ) 
+result = margvar * as.vector(R %*% Ur %*% resmat %*% Uc_t %*% t(G) )
+head(result)
+head(postmeantruth)
+# inspect resulting predicted mean surface
+persp(t1,xstar,matrix(result, nrow = nt),theta = 130-90, phi = 10,xlab='t',ylab='x',zlab='f',zlim=c(-3,3)) -> res
+points(trans3d(xstar_grid[,1], xstar_grid[,2], result, pmat = res), col = 'black', pch = 16,cex=.7)
+
+
+# check if correct
+# these are NOT 100% identical. Not sure why. Rounding error maybe? 
+all.equal(postmeantruth, result)
+postmeantruth
 
 #################
 # Example 2
 #################
+# actually I don't think we need this...
 # Make up some data that comes from the true generating process 
-n1 = 44; n2 = 40
-t1=seq(0,1,length=n1)
-x1=seq(0,1,length=n2)
-x=expand.grid(t1,x1)
-Tdist = make_distmat(cbind(t1,0))
-Xdist = make_distmat(cbind(0, x1))
 
-# NOTE
-# C = Covx
-# R = Covt
-Covt = covpow(cbind(t1,0),scale=.5)
-k=nrow(Covt)
-Covx = covpow(cbind(0,x1),scale=.8)
-p=nrow(Covx)
-Cnug = .0003
-margvar = 1.5
-KronCovmat = margvar * kronecker(Covx, Covt) +  diag(Cnug, nrow = p*k, ncol = p*k) 
-mySim = rmultnorm(1, rep(0, p*k), KronCovmat)
-mySim = as.vector(mySim)
-#persp(t1,x1,matrix(mySim,nrow=n1),theta = 130-90, phi = 10,xlab='t',ylab='x',zlab='f',zlim=c(-3,3)) -> res
-#points(trans3d(x[,1], x[,2], mySim, pmat = res), col = 'black', pch = 16,cex=.7)
-#range(mySim)
-
-
-# ok, this seems to work pretty well. Better to use more data!
-testmkb = nmkb(c(0.5, .5, .001, 1), Estimate_params, distC = Xdist, distR = Tdist, z=mySim,
-               lower = c(0.1, 0.1, 0.000001, .5), upper = c(10, 10, 1, 5))
-testmkb
-#dmvnorm(x=z, mean = rep(0, nrow(SigGGT)), sigma = SigGGT, log = T)
 #######################################################################################################
