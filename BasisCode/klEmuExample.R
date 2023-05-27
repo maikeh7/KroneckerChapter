@@ -9,13 +9,7 @@ x=expand.grid(t1,x1)
 
 # a deterministic function to be emulated
 f = (x[,2]+1)*cos(pi*x[,1])
-f = (x[,2]+1)*cos(pi*x[,1]) + .03*(x[,2]-.5)^2 -.003056
 f = (x[,2]+1)*cos(pi*x[,1]) + .03*(exp(x[,2]))
-
-# look at function over a 2-d grid
-par(mfrow=c(2,2),oma=c(0,0,0,0),mar=c(1,1,1,1))
-persp(t1,x1,matrix(f,nrow=n1),theta = 130-90, phi = 10,xlab='t',ylab='x',zlab='f',zlim=c(-2.2,2.4)) -> res
-points(trans3d(x[,1], x[,2], f, pmat = res), col = 'black', pch = 16,cex=.7)
 
  # make a pretty fig for the chapter
 PDF=FALSE
@@ -24,11 +18,6 @@ par(mfrow=c(1,1),oma=c(0,0,0,0),mar=c(1,1,1,1))
 persp(t1,x1,matrix(f,nrow=n1),theta = 40, phi = 10,xlab='t',ylab='x',zlab='f',zlim=c(-2.2,2.4)) -> res
 points(trans3d(x[,1], x[,2], f, pmat = res), col = 'black', pch = 16,cex=.7)
 if(PDF) dev.off()
-
-###### let's use this example to show the knronecker approach
- # load is some spatial cov functions
-#source('~/Dave/Courses/Spatial/Shortcourse/SampleCode/gensurf.r')
- # x1 and x2
 
 # a function to make the Gaussian covariance matrix
 covpow <- function(locs,pow=2,scale=5){
@@ -47,72 +36,48 @@ CovFull = covpow(x,scale=1)
 
  # do the same thing with a kronecker trick
 Covt = covpow(cbind(t1,0),scale=1)
+Covtf = covpow(cbind(t1f,0),scale=1)
 Covx = covpow(cbind(0,x1),scale=1)
 CovKr = kronecker(Covx,Covt)
  # check that these covariance matrices are equal
 summary(as.vector((CovFull-CovKr)))
 
-# recall in our construction of x1 and x2, x1 is varying faster so
-# make the matrix of computer model output where each column is a run.
-fmat = matrix(f,nrow=n1)
-
- # subtract out the mean of the columns of fmat
-meanf = apply(fmat,1,mean)
-fmat0 = fmat - meanf
-fsvd = svd(fmat0)
+ # use K-L decomp to come up with bases
+eigt = eigen(Covt,symmetric=TRUE)
 
 par(mfrow=c(2,2),oma=c(0,0,0,0),mar=c(4,4,1,1))
-matplot(t1,fmat0,type='l')
-plot(fsvd$d)
-matplot(t1,fsvd$u,type='l')
- # grab the first two bases; n2 = number of multivariate simulations n_c
-q=2
-K = fsvd$u[,1:q] %*% diag(fsvd$d[1:q]) / sqrt(n2)
+par(pty='s')
+image(t1,t1,Covt)
+par(pty='m')
+plot(eigt$values^.5)
+matplot(t1,eigt$vectors[,1:6],type='l')
+ # grab the first q bases; n2 = number of multivariate simulations n_c
+q=5
+ # create basis matrix K; scale columns by sqrt(values) and length
+ # This gives w-hat's that are ||k_i||^2 = 1.
+K = eigt$vectors[,1:q] %*% diag(sqrt(eigt$values[1:q])) * sqrt(n1)
 matplot(t1,K,type='l')
- # compute the w-hat's
-what = fsvd$v[,1:q] * sqrt(n2)
-matplot(x1,what,type='p',pch=16)
- # note the crude variance (around 0) of each col of what is 1
- # So modeling each col of what with a GP(0,1*R(x,x')) isn't too bad.
-var0 <- function(x) mean(x^2)
-apply(what,2,var0)
+ # a slightly more efficient version
+what = lsfit(K,fmat,int=FALSE)$coef
+matplot(x1,t(what),type='p',pch=16)
 
- # a pdf for the paper
-PDF=FALSE
-if(PDF) pdf('pcSimple.pdf',width=10.5,height=2.8)
-par(mfrow=c(1,4),oma=c(0,0,0,0),mar=c(4,4,1.7,1))
-matplot(t1,fmat0,type='l',xlab='',ylab='',ylim=c(-.5,.5))
-mtext('output support t',side=1,line=2.2)
-mtext('y - mean(y)',side=2,line=2.2)
-mtext('centered model output',side=3,line=.2)
-plot(fsvd$d,pch=16,xlab='',ylab='')
-mtext('basis number',side=1,line=2.2)
-mtext('singular values',side=2,line=2.2)
-mtext('singular values',side=3,line=.2)
-matplot(t1,K,type='l',lty=1,xlab='',ylab='',ylim=c(-.5,.5))
-mtext('output support t',side=1,line=2.2)
-mtext('k1,k2',side=2,line=2.2)
-mtext('q=2 bases',side=3,line=.2)
-matplot(x1,what,pch=16,xlab='',ylab='',ylim=c(-2,2))
-mtext('input x',side=1,line=2.2)
-#mtext('w-hat(x)',side=2,line=2.2)
-mtext(expression(hat(w)(x)),side=2,line=2.1)
-mtext('weights',side=3,line=.2)
-if(PDF) dev.off()
+ # note the crude variance (around 0) of each col of what not necessarily
+ # 1 as it is in the svd basis case.  So we probably want to estimate
+ # marginal variances for each w_k(x).
+var0 <- function(x) mean(x^2)
+apply(t(what),2,var0)
 
  # check: what could also be determined by projecting the sims onto K
 In2 = diag(rep(1,n2))
-Kbig = cbind(kronecker(In2,K[,1]),kronecker(In2,K[,2]))
-#Kbig = kronecker(In2,K[,1])
+Kbig = cbind(kronecker(In2,K[,1]),kronecker(In2,K[,2]),kronecker(In2,K[,3]),kronecker(In2,K[,4]),kronecker(In2,K[,5]))
+# compute the w-hat's using lsfit - first with formula in chap
+what2 = lsfit(Kbig,f,int=FALSE)$coef
+ # check that this matches the other w-hat calucation
+matplot(x1,matrix(what2,nrow=n2),type='p',pch=16)
 
-what2 = solve(t(Kbig)%*%Kbig,t(Kbig)%*%as.vector(fmat0))
-solve(t(K)%*%K,t(K)%*%fmat0)
-#what2 = solve(t(Kbig)%*%Kbig+diag(rep(1e-10,q*n2)),t(Kbig)%*%f)
-# note, since this system is so singular (1 singular value explains everything)
-# what2 blows up for the second component.  The svd-based what calculation above is more stable.
-
+ # computing the det needed in the likelihood calulation
  # det(t(Kbig)%*%Kbig) = det(t(K)%*%K)^n2
-sum(log(diag(chol(t(Kbig)%*%Kbig)))). # slow, using Kbig
+sum(log(diag(chol(t(Kbig)%*%Kbig))))  # slow, using Kbig
 sum(log(diag(chol(t(K)%*%K))))*n2     # fast, requires orthogonal kj's
 
 # make likelihood function

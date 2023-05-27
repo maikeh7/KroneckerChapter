@@ -60,12 +60,8 @@ apply(what,2,var0)
  # check: what could also be determined by projecting the sims onto K
 Inc = diag(rep(1,nc))
 Kbig = cbind(kronecker(Inc,K[,1]),kronecker(Inc,K[,2]),kronecker(Inc,K[,3]),kronecker(Inc,K[,4]),kronecker(Inc,K[,5]))
-#Kbig = kronecker(In2,K[,1])
 what2 = solve(t(Kbig)%*%Kbig,t(Kbig)%*%as.vector(y))
 solve(t(K)%*%K,t(K)%*%y)
-#what2 = solve(t(Kbig)%*%Kbig+diag(rep(1e-10,q*n2)),t(Kbig)%*%f)
-# note, since this system is so singular (1 singular value explains everything)
-# what2 blows up for the second component.  The svd-based what calculation above is more stable.
 
  # det(t(Kbig)%*%Kbig) = det(t(K)%*%K)^n2
 sum(log(diag(chol(t(Kbig)%*%Kbig))))

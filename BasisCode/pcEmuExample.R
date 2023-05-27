@@ -8,8 +8,7 @@ x1=seq(0,1,length=n2)
 x=expand.grid(t1,x1)
 
 # a deterministic function to be emulated
-f = (x[,2]+1)*cos(pi*x[,1])
-f = (x[,2]+1)*cos(pi*x[,1]) + .03*(x[,2]-.5)^2 -.003056
+#f = (x[,2]+1)*cos(pi*x[,1])
 f = (x[,2]+1)*cos(pi*x[,1]) + .03*(exp(x[,2]))
 
 # look at function over a 2-d grid
@@ -46,11 +45,7 @@ covpow <- function(locs,pow=2,scale=5){
 CovFull = covpow(x,scale=1)
 
  # do the same thing with a kronecker trick
-Covt = covpow(cbind(t1,0),scale=1)
 Covx = covpow(cbind(0,x1),scale=1)
-CovKr = kronecker(Covx,Covt)
- # check that these covariance matrices are equal
-summary(as.vector((CovFull-CovKr)))
 
 # recall in our construction of x1 and x2, x1 is varying faster so
 # make the matrix of computer model output where each column is a run.
@@ -77,29 +72,6 @@ matplot(x1,what,type='p',pch=16)
 var0 <- function(x) mean(x^2)
 apply(what,2,var0)
 
- # a pdf for the paper
-PDF=FALSE
-if(PDF) pdf('pcSimple.pdf',width=10.5,height=2.8)
-par(mfrow=c(1,4),oma=c(0,0,0,0),mar=c(4,4,1.7,1))
-matplot(t1,fmat0,type='l',xlab='',ylab='',ylim=c(-.5,.5))
-mtext('output support t',side=1,line=2.2)
-mtext('y - mean(y)',side=2,line=2.2)
-mtext('centered model output',side=3,line=.2)
-plot(fsvd$d,pch=16,xlab='',ylab='')
-mtext('basis number',side=1,line=2.2)
-mtext('singular values',side=2,line=2.2)
-mtext('singular values',side=3,line=.2)
-matplot(t1,K,type='l',lty=1,xlab='',ylab='',ylim=c(-.5,.5))
-mtext('output support t',side=1,line=2.2)
-mtext('k1,k2',side=2,line=2.2)
-mtext('q=2 bases',side=3,line=.2)
-matplot(x1,what,pch=16,xlab='',ylab='',ylim=c(-2,2))
-mtext('input x',side=1,line=2.2)
-#mtext('w-hat(x)',side=2,line=2.2)
-mtext(expression(hat(w)(x)),side=2,line=2.1)
-mtext('weights',side=3,line=.2)
-if(PDF) dev.off()
-
  # check: what could also be determined by projecting the sims onto K
 In2 = diag(rep(1,n2))
 Kbig = cbind(kronecker(In2,K[,1]),kronecker(In2,K[,2]))
@@ -112,7 +84,7 @@ solve(t(K)%*%K,t(K)%*%fmat0)
 # what2 blows up for the second component.  The svd-based what calculation above is more stable.
 
  # det(t(Kbig)%*%Kbig) = det(t(K)%*%K)^n2
-sum(log(diag(chol(t(Kbig)%*%Kbig)))). # slow, using Kbig
+sum(log(diag(chol(t(Kbig)%*%Kbig))))  # slow, using Kbig
 sum(log(diag(chol(t(K)%*%K))))*n2     # fast, requires orthogonal kj's
 
 # make likelihood function
