@@ -30,8 +30,8 @@ kmat = matrix(0, nrow = length(train_idx_kron), ncol = nrow(Sigma22))
 # b/c the training samples are stacked first, kmat will be identiy matrix for
 # the first several row/cols and then just zeros
 kmat[train_idx_kron, train_idx_kron] = diag(1, nrow= length(train_idx_kron))
-# get the other components
 
+# nugget-sigma^2 in Nychka's paper
 sigmasq = 0.001
 
 #checked--this is kronecker(covx, covt)
@@ -58,7 +58,7 @@ persp(t1, xstar, matrix(true_realization[test_idx_kron], nrow = n1),theta = 130-
 points(trans3d(plot_grid[,1], plot_grid[,2], true_realization[test_idx_kron], pmat = res),
        col = 'black', pch = 16,cex=.7)
 
-
+# for comparison to Nychka
 Lots_of_realizations = rmultnorm(200, zhat, True_cond_cov)
 dim(Lots_of_realizations)
 est_mean_true =apply(Lots_of_realizations, 2, mean)
