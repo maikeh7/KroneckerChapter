@@ -1,10 +1,11 @@
 source("Cov_functions.R")
 source("Estimation_1D.R")
+library(dfoptim)
 ############
 # Example 1
 ############
 # Estimating params using our deterministic fucntion f
-nt = 20; nx = 11
+nt = 11; nx = 10
 t1=seq(0,1,length=nt)
 x1=seq(0,1,length=nx)
 x=expand.grid(t1,x1)
@@ -31,12 +32,14 @@ scaleX = params[1]
 scalet = params[2]
 Cnug = params[3]
 margvar = params[4]
-scalet=.1
+pow=2
+
 Covt = covpow(cbind(t1,0),scale= scalet)
 Covx = covpow(cbind(0,x1),scale= scaleX)
 CovKr = kronecker(Covx,Covt) # so we can check results later
 
-nt = 20; nstar = 25
+nt = 11; nstar = 25
+
 # prediction grid for x
 xstar = seq(0,1, length = nstar)
 xstar_grid = expand.grid(t1, xstar)
@@ -83,7 +86,7 @@ postmeantruth = as.vector(margvar*kronecker(Cov_xstar_x, Covt) %*% solve(KronCov
 InvSSmat = diag(1/(margvar*as.vector(outer(Sr, Sc)) + Cnug))
 
 # reshape z to be kxp
-zreshape = matrix(mySim, nrow=k, ncol=p)
+zreshape = matrix(f, nrow=k, ncol=p)
 
 #res1 = InvSSmat %*% as.vector(solve(Uc) %*% zreshape %*% Ur)
 res1 = InvSSmat %*% as.vector(solve(Ur) %*% zreshape %*% Uc)
@@ -93,13 +96,12 @@ resmat = matrix(res1, nrow=k, ncol=p)
 
 #result = margvar * as.vector(C %*% Uc %*% resmat %*% Ur_t %*% t(G) ) 
 result = margvar * as.vector(R %*% Ur %*% resmat %*% Uc_t %*% t(G) )
-head(result)
-head(postmeantruth)
+
 # inspect resulting predicted mean surface
 persp(t1,xstar,matrix(result, nrow = nt),theta = 130-90, phi = 10,xlab='t',ylab='x',zlab='f',zlim=c(-3,3)) -> res
 points(trans3d(xstar_grid[,1], xstar_grid[,2], result, pmat = res), col = 'black', pch = 16,cex=.7)
 
-
+length(result)
 # check if correct
 # these are NOT 100% identical. Not sure why. Rounding error maybe? 
 all.equal(postmeantruth, result)

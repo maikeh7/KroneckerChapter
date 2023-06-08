@@ -26,6 +26,50 @@ rmultnorm <- function(n,mu,sigma){
   zz + matrix(mu,nrow=n,ncol=p,byrow=T)
 }
 
+# generate efficient realizations from 0 mean GP
+# w/ covariance matrix kronecker(R, C)
+# may not work if matrix is ill conditioned (use rmultnorm_svd())
+rmultnorm_Cholesky = function(R, C){
+  LR = chol(R, pivot=T)
+  LC = chol(C, pivot =T)
+  pivR = attr(LR, "pivot")
+  pivC = attr(LC, "pivot")
+  ordR = order(pivR)
+  ordC = order(pivC)
+  LR = LR[,ordR]
+  LC = LC[,ordC]
+  p = dim(R)[1]
+  k = dim(C)[1]
+  
+  z = matrix(rnorm(p*k), nrow=k, ncol = p)
+  
+  #mean matrix has same dimensions as z
+  mu = matrix(rep(0, p*k), nrow = k, ncol = p)
+  mysim = mu + t(LC) %*% z %*% LR
+  
+  #h2 = mu + %*% z %*% t(LsigT) 
+  mysim = as.vector(mysim)
+  return(mysim)
+}
+
+# generate efficient realizations from 0 mean GP
+# w/ covariance matrix kronecker(R, C)
+# using svd rather than cholesky
+rmultnorm_SVD = function(R, C){
+  p = dim(R)[1]
+  k = dim(C)[1]
+  svdR = svd(R)
+  svdC = svd(C)
+  R_U = svdR$u
+  C_U = svdC$u
+  R_d = diag(sqrt(svdR$d))
+  C_d = diag(sqrt(svdC$d))
+  z = matrix(rnorm(p*k), nrow= k, ncol = p)
+  mu = matrix(rep(0, p*k), nrow = k, ncol = p)
+  h3 = (C_U %*% C_d) %*% z %*% t(R_U %*% R_d) + mu
+  mysim = as.vector(h3)
+  return(mysim)
+}
 
 make_distmat = function(locs){
   d1 <- dist(locs)
