@@ -84,8 +84,3 @@ sum(log(diag(chol(t(K)%*%K))))*n2     # fast, requires orthogonal kj's
 # find ML parameter settings
 # make some "posterior" draws of the emulator at a new x*
 
-
-
-
-
-

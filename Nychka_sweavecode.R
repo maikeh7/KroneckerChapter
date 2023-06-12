@@ -1,5 +1,14 @@
 source("Cov_functions.R")
 source("Estimation_1D.R")
+
+locs1=x1
+locs2 = c(.4,.5)
+# this makes general distance matrices for vectors of 1d locations x and y
+eudis = function(x, y) { sqrt( sum( (x-y)^2 ) ) } 
+
+outer(1:10, 1:2, FUN=Vectorize(function(x, y) eudis(locs1[x], locs2[y])))
+
+
 # make the 2-d x support
 nt = 11; nx = 10     
 
@@ -40,6 +49,7 @@ xstar_grid = c(x1, xstar)
 # (Sigma = kronecker(Cov_(x*,x*), Cov_t))
 Cov_xstar_xstar = covpow(cbind(0, xstar_grid), scale = scaleX)
 
+?dist
 # make distance matrices (used for obtaining conditional mean)
 distmat_xstar_x = abs(outer(xstar_grid, x1, "-"))
 

@@ -15,8 +15,13 @@ f = (x[,2]+1)*cos(pi*x[,1])
 par(mfrow=c(2,2),oma=c(0,0,0,0),mar=c(1,1,1,1))
 persp(t1,x1,matrix(f,nrow=n1),theta = 130-90, phi = 10,xlab='t',ylab='x',zlab='f',zlim=c(-2,2)) -> res
 points(trans3d(x[,1], x[,2], f, pmat = res), col = 'black', pch = 16,cex=.7)
-
- # make a pretty fig for the chapter
+test=matrix(f,nrow=n1)
+dim(test) 
+nrow(x)
+length(t1)
+length(x1)
+res
+# make a pretty fig for the chapter
 PDF=FALSE
 if(PDF) pdf('simplef.pdf',width=3,height=3)
 par(mfrow=c(1,1),oma=c(0,0,0,0),mar=c(1,1,1,1))
