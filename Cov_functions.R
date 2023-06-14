@@ -9,11 +9,18 @@ covpow <- function(locs,pow=2,scale=5){
 }
 
 eudis = function(x, y) { sqrt( sum( (x-y)^2 ) ) } 
-calc_general_distmat = function(locs1, locs2){
-  seq1 = 1:length(locs1)
-  seq2 = 1:length(locs2)
-  outer(seq1, seq2, FUN=Vectorize(function(x, y) eudis(locs1[x], locs2[y])))
+
+get_distmat = function(l1, l2){
+  seq1 = 1:length(l1)
+  seq2 = 1:length(l2)
+  outer(seq1, seq2, FUN = Vectorize(function(x, y) eudis(l1[x], l2[y])))
 }
+?dist
+
+make_covmat_Gauss = function(distmat, scale, pow = 2){
+  exp(-(distmat / scale)^pow)
+}
+
 
 # function to generate MVN realizations (using svd decomposition, not cholesky!)
 rmultnorm <- function(n,mu,sigma){

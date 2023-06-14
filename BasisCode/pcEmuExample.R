@@ -113,12 +113,13 @@ K %*% (solve)
 # note n2 = nc
 nc = n2
 parameters = list(1, c(2,2), c(1,2))
-Estimate_params = function(parameters, f, nc, x1){
-  nu = parameters[[1]]
-  phi = parameters[[2]]
-  sig2 = parameters[[3]]
+Estimate_params = function(parameters, f, n1, x1){
+  nu = parameters[1]
+  phi = parameters[2:3]
+  sig2 = parameters[4:5]
   # make f into matrix of appropriate dims
-  fmat = matrix(f, ncol = nc)
+  fmat = matrix(f, ncol = n1)
+  nc = ncol(fmat)
   # subtract means of rows
   meanf = apply(fmat,1,mean)
   fmat0 = fmat - meanf
@@ -176,8 +177,90 @@ Estimate_params = function(parameters, f, nc, x1){
   return(-MylogLik) #return negative log likelihood
 }
 
+params = nmkb(parameters = c(1,1,1,1,1), 
+              Estimate_params, f=myF, n1=myn, x1=myx,
+              lower = c(.01,.01,.01,.01,.01), upper = rep(20, 5))
 
-dim(covmat_j)
+lower = .01, upper = 100)
+myF = f
+myn = n1
+myx = x1
+params = nmkb(parameters = 1, 
+              Estimate_params, f=myF, n1=myn, x1=myx),
+              lower = .01, upper = 100)
+dim(fmat)
+nc
+Estimate_params = function(parameters, f, n1, x1){
+  nu =1
+  phi = c(.001, 1)
+  sig2 = c(2,2)
+  # make f into matrix of appropriate dims
+  fmat = matrix(f, ncol = n1)
+  nc = ncol(fmat)
+  # subtract means of rows
+  meanf = apply(fmat,1,mean)
+  fmat0 = fmat - meanf
+  
+  # do svd
+  fsvd = svd(fmat0)
+  
+  # number of bases to include
+  q = length(phi)
+  n2 = nc
+  n1 = nrow(fmat0)
+  # make K
+  K = fsvd$u[,1:q] %*% diag(fsvd$d[1:q]) / sqrt(n2)
+  
+  s = nrow(K)
+  
+  # also stupid!!! we don't want to do this!!! bad bad bad
+  In2 = diag(rep(1,n2))
+  Kbig = cbind(kronecker(In2,K[,1]),kronecker(In2,K[,2]))
+  fvec = matrix(fmat0, nrow=1, ncol = length(f))
+  
+  # this is stupid but wtf can't quickly see another way to get this bad bad bad
+  fcalc = fvec %*% (diag(1, nrow = length(f), ncol = length(f)) - 
+                      Kbig %*% solve(t(Kbig) %*% Kbig) %*% t(Kbig) ) %*% t(fvec)
+  
+  # or nc?? not n2? i guess they are equal
+  part_two = ((s-q)*n2 / 2) * log(nu) - 1/2 * 1 / nu * fcalc
+  
+  # get what...this would only work for svd though
+  # actually, don't need this
+  #what = fsvd$v[,1:q] * sqrt(n2)
+  
+  results_vec = vector(length = q)
+  Xdist = make_distmat(cbind(0, x1))
+  j=1
+  for(j in q){
+    kj = K[, j]
+    covmat_j  = sig2[j]*exp(-(phi[j]*Xdist)^2)
+    part_one = nu / t(kj) %*% (kj) # this is a scalar
+    # so...this does not make sense to me....can't add scalar to matrix in R....
+    # ask Dave...not sure about this!!
+    part_one = matrix(rep(part_one, nrow(covmat_j)*nrow(covmat_j)), nrow=nrow(covmat_j))
+    chunk = part_one + covmat_j
+    
+    #LogDet = 2*sum(log(diag(chol(chunk)))) # why is this off by a factor of 2?
+    LogDet = determinant(chunk, logarithm = TRUE)$modulus
+    what_j = fsvd$v[ ,q] * sqrt(n2)
+    # faster
+    
+    cholChunk = chol(Ch+ diag(0.00001, nrow=nrow(chunk)))
+    ssq = sum(solve(cholChunk, what_j^2))
+    loglike = - .5*LogDet - .5*ssq - 0.5 * part_two
+    
+    results_vec[j] = loglike
+  } 
+  
+  MylogLik = sum(results_vec)
+  return(-MylogLik) #return negative log likelihood
+}
+
+
+
+
+
 q=1
 dim(kj)
 nu=10
