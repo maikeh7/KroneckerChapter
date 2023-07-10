@@ -1,17 +1,12 @@
-library(dfoptim)
-# set up
-s = 11         # size of output space
-nc = 10        # number of computer model runs
-
-t1=seq(0,1,length=s)
-x1=seq(0,1,length=nc)
-x=expand.grid(t1,x1)
-f = (x[,2]+1)*cos(pi*x[,1]) + .03*(exp(x[,2]))
-
-# function that carries out the optimization
-# user only has to input, f, n1, x1 and q--function returns a list where
-# each element of the list are the phi's and sig2's corresponding to however many q's there are
-# I set nu = 1e-6. Let me know if you want to change that
+###########################################################################################
+# function that carries out optimization
+# f -- computer model output (vector)
+# x1 -- space coordinates of f x1
+# q --  number of bases (>0)
+# This function returns a list where each element of the list are the phi_j's and sig2_j's
+# corresponding to q_j
+# nu is set to 1e-6
+###########################################################################################
 ML_pcEMU = function(fn, x, q=2){
   stuff = pre_process(fn, x, q)
   K = stuff$K
@@ -25,15 +20,15 @@ ML_pcEMU = function(fn, x, q=2){
   return(paramList)
 }
 
-testing = ML_pcEMU(fn = f, x = x1, q=2)
-testing
+
+
 #####################################################################################
 # main function for optimization
-# myObject comes from pre_process(), iterNum is current basis element (j = 1..q), 
-# but user doesn't have to worry about entering iterNum
+# myObject comes from pre_process(), 
+# iterNum is current basis element (j = 1..q), 
 #####################################################################################
 Estimate_params_pcEm = function(parameters, myObject, iterNum){
- 
+  
   phi = parameters[1]
   sig2 = parameters[2]
   
@@ -54,11 +49,11 @@ Estimate_params_pcEm = function(parameters, myObject, iterNum){
   covmat_j  = sig2*exp(-phi*Xdist^2) + diag(rep(nug, nc))
   
   chCov_j = chol(covmat_j)
-
+  
   LogDet = 2*sum(log(diag(chCov_j))) 
   
   what_j = fsvd$v[ ,iterNum] * sqrt(nc)
-
+  
   vec = backsolve(chCov_j, what_j)
   
   ssq  = sum(vec^2)
@@ -69,7 +64,8 @@ Estimate_params_pcEm = function(parameters, myObject, iterNum){
 }
 
 ######################################################
-# pre process f, get K and second chunk of likelihood
+# pre process f (computer output), 
+# make K and compute second part of likelihood
 ######################################################
 pre_process = function(fn, x, q, nu=1e-6){
   # make f into matrix of appropriate dims
@@ -110,10 +106,3 @@ pre_process = function(fn, x, q, nu=1e-6){
   return(list(L2= L2, K = K, fmat0=fmat0, fsvd=fsvd, s = s, nu = nu,
               nc = nc, x=x, xdist=xdist, q=q))
 }
-
-# for testing -- junk
-
-stuff=pre_process(f,x1, q=2)
-
-test=nmkb(par = c(1, 1), fn = Estimate_params_pcEm, lower=.001, upper=100,
-          myObject = stuff)

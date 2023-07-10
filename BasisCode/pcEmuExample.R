@@ -181,28 +181,11 @@ params = nmkb(parameters = c(1,1,1,1,1),
               Estimate_params, f=myF, n1=myn, x1=myx,
               lower = c(.01,.01,.01,.01,.01), upper = rep(20, 5))
 
-lower = .01, upper = 100)
-myF = f
-myn = n1
-myx = x1
-params = nmkb(parameters = 1, 
-              Estimate_params, f=myF, n1=myn, x1=myx),
-              lower = .01, upper = 100)
-dim(fmat)
-nc
+
 Estimate_params = function(parameters, f, n1, x1){
-  nu =1
+  nu = 1e-6
   phi = c(.001, 1)
   sig2 = c(2,2)
-  # make f into matrix of appropriate dims
-  fmat = matrix(f, ncol = n1)
-  nc = ncol(fmat)
-  # subtract means of rows
-  meanf = apply(fmat,1,mean)
-  fmat0 = fmat - meanf
-  
-  # do svd
-  fsvd = svd(fmat0)
   
   # number of bases to include
   q = length(phi)
@@ -231,23 +214,25 @@ Estimate_params = function(parameters, f, n1, x1){
   
   results_vec = vector(length = q)
   Xdist = make_distmat(cbind(0, x1))
-  j=1
+  
   for(j in q){
     kj = K[, j]
     covmat_j  = sig2[j]*exp(-(phi[j]*Xdist)^2)
-    part_one = nu / t(kj) %*% (kj) # this is a scalar
-    # so...this does not make sense to me....can't add scalar to matrix in R....
-    # ask Dave...not sure about this!!
-    part_one = matrix(rep(part_one, nrow(covmat_j)*nrow(covmat_j)), nrow=nrow(covmat_j))
+    part_one = nu / sum(kj^2) # this is a scalar
+    
     chunk = part_one + covmat_j
     
     #LogDet = 2*sum(log(diag(chol(chunk)))) # why is this off by a factor of 2?
     LogDet = determinant(chunk, logarithm = TRUE)$modulus
+    
     what_j = fsvd$v[ ,q] * sqrt(n2)
     # faster
-    
-    cholChunk = chol(Ch+ diag(0.00001, nrow=nrow(chunk)))
-    ssq = sum(solve(cholChunk, what_j^2))
+   
+    # look at solve use forward or backsolve
+    # could use pivot but then need to make sure back/forward solve works correctly
+    vec = backsolve(chunk, what_j, transpose = TRUE)
+    ssq  = sum(vec^2)
+    ssq = sum(solve(chol(chunk), what_j)^2)
     loglike = - .5*LogDet - .5*ssq - 0.5 * part_two
     
     results_vec[j] = loglike
@@ -257,6 +242,49 @@ Estimate_params = function(parameters, f, n1, x1){
   return(-MylogLik) #return negative log likelihood
 }
 
+make_distmat = function(locs){
+  d1 <- dist(locs)
+  n <- dim(locs)[1]
+  mat <- matrix(0,n,n)
+  mat[lower.tri(mat)] <- d1
+  mat <- mat+t(mat)
+  return(mat)
+}
+
+pre_process = function(f, n1, q){
+  # make f into matrix of appropriate dims
+  fmat = matrix(f, nrow=n1)
+  nc = ncol(fmat)
+  
+  # subtract means of rows
+  meanf = apply(fmat, 1, mean)
+  fmat0 = fmat - meanf
+  
+  # do svd
+  fsvd = svd(fmat0)
+  
+  # number of bases to include
+  n1 = nrow(fmat0)
+  
+  # make K
+  K = fsvd$u[,1:q] %*% diag(fsvd$d[1:q]) / sqrt(nc)
+  
+  s = nrow(K)
+  
+  # also stupid!!! we don't want to do this!!! bad bad bad
+  In2 = diag(rep(1, nc))
+  Kbig = cbind(kronecker(In2,K[,1]), kronecker(In2,K[,2]))
+  fvec = matrix(fmat0, nrow = 1, ncol = length(f))
+  
+  # this is stupid but wtf can't quickly see another way to get this bad bad bad
+  fcalc = fvec %*% (diag(1, nrow = length(f), ncol = length(f)) - 
+                      Kbig %*% solve(t(Kbig) %*% Kbig) %*% t(Kbig) ) %*% t(fvec)
+  
+  # or nc?? not n2? i guess they are equal
+  L2 = ((s - q)*nc / 2) * log(nu) - 1/2 * (1 / nu) * fcalc
+  
+  return(list(L2= L2, K = K, fmat0)) # anything else?
+}
 
 
 

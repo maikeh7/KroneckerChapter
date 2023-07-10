@@ -1,19 +1,32 @@
-
 source("Cov_functions.R")
 source("Estimation_1D.R")
+source("Estimation_Basis.R")
 # make the 2-d x support
-nt = 11; nx = 10     
+s = 11; nc = 10     
 
-t1 = seq(0,1,length=nt)
-x1 = seq(0,1,length=nx)
-x = expand.grid(t1,x1)
+t1 = seq(0,1,length = s)
+x1 = seq(0,1,length = nc)
+x = expand.grid(t1, x1)
 
 # a deterministic function to be emulated
-f = (x[,2]+1)*cos(pi*x[,1])
+f = (x[,2]+1)*cos(pi*x[,1]) + .03*(exp(x[, 2]))
+
+persp(t1, x1, 
+      matrix(f, nrow = s),
+      theta = 130-90, 
+      phi = 10,
+      xlab = 't', ylab ='x', zlab = 'f',
+      zlim = c(-2.2, 2.4)) -> res
+
+points(trans3d(x[, 1], x[, 2], 
+               f,
+               pmat = res),
+       col = 'black',
+       pch = 16,
+       cex = 0.7)
 
 Tdist = get_distmat(t1, t1)
 Xdist = get_distmat(x1, x1)
-
 
 # this function assumes the kronecker product: kronecker(C, R), so order matters
 params = nmkb(c(0.5, .5, .0001, .5), 
@@ -27,16 +40,17 @@ print(params$par[4])
 
 scaleX = params$par[1]
 scalet = params$par[2]
+
 Covt = make_covmat_Gauss(distmat = Tdist, scale = scalet, pow = 2) 
 Covx = make_covmat_Gauss(distmat = Xdist, scale = scaleX, pow = 2)
 
-nt = 11; nstar = 25
+s = 11; nstar = 25
 
 # prediction grid for x_star
-xstar = seq(0,1, length = nstar)
-
+xnew = seq(0,1, length = nstar)
+xnew = c(.13, .72, .97)
 # in Nychka's setup, combine train and test points
-xstar_grid = c(x1, xstar)
+xstar_grid = c(x1, xnew)
 
 # This will be used for getting Nychka's 'Sigma'
 # (Sigma = kronecker(Cov_(x*,x*), Cov_t))
@@ -77,20 +91,25 @@ margvar = params$par[4]
 
 # inverse of kronecker of singular values of C and R
 # equivalent to kronecker(Sc, Sr)! 
+InvSSmat=diag(1 / (margvar*kronecker(Sc, Sr) + sigma_sq))
+
 InvSSmat = diag(1/(margvar*as.vector(outer(Sr, Sc)) + sigma_sq))
-v = (margvar*as.vector(outer(Sr, Sc)) + sigma_sq)
+
+
+#v = (margvar*as.vector(outer(Sr, Sc)) + sigma_sq)
 
 # reshape the response to be k * p
 zreshape = matrix(f, nrow = k, ncol = p)
 
-res1 = InvSSmat %*% as.vector(solve(Ur) %*% zreshape %*% Uc)
+res1 = InvSSmat %*% as.vector(Ur_t %*% zreshape %*% Uc)
 
 
 resmat = matrix(res1, nrow = k, ncol = p)
 
 cond_mean = margvar * as.vector(R %*% Ur %*% resmat %*% Uc_t %*% t(G) )
 
-test = margvar * as.vector(Ur %*% diag(Sr, nrow=nrow(Ur)) %*% resmat %*% Uc_t %*% t(G) )
+# equivalent to cond_mean--Dave has this in the chapter
+#test = margvar * as.vector(Ur %*% diag(Sr, nrow=nrow(Ur)) %*% resmat %*% Uc_t %*% t(G) )
 
 head(test)
 head(cond_mean)
@@ -98,7 +117,8 @@ test- cond_mean
 
 # grid for plotting 
 # note we only plot test locations here
-plot_grid = expand.grid(t1, xstar)
+plot_grid = expand.grid(t1, xnew)
+plot_grid_train = expand.grid(t1, x1)
 
 # this is for differentiating train/test indices
 train_idx = 1:length(x1)
@@ -106,20 +126,29 @@ train_idx_kron = 1:(length(train_idx) * length(t1))
 test_idx_kron = (train_idx_kron[length(train_idx_kron)] + 1): nrow(Sigma22)
 
 
-persp(t1, xstar,
-      matrix(cond_mean[test_idx_kron], nrow = nt),
+persp(t1, x1,
+      matrix(cond_mean[train_idx_kron], nrow = s),
       theta = 130-90,
       phi = 10,
       xlab = 't', ylab = 'x', zlab = 'f', 
-      zlim = c(-3,3)) -> res
+      zlim = c(-2.2, 2.4)) -> res
 
-points(trans3d(plot_grid[,1],
-               plot_grid[,2], 
-               cond_mean[test_idx_kron],
+points(trans3d(plot_grid_train[,1],
+               plot_grid_train[,2], 
+               cond_mean[train_idx_kron],
                pmat = res),
        col = 'black',
        pch = 16,
        cex = 0.7)
+
+points(trans3d(plot_grid[, 1],
+               plot_grid[, 2], 
+               cond_mean[test_idx_kron],
+               pmat = res),
+       col = 'red',
+       pch = 16,
+       cex = 0.7)
+legend("topright", legend = c("train", "test"), col = c("black", "red"), pch=19)
 
 # this is Nychka's Sigma
 Sigma22 = kronecker(Cov_xstar_xstar, Covt)
@@ -153,19 +182,30 @@ True_cond_cov =  Sigma22 - Sigma12 %*% solve(Sigma11) %*% Sigma21
 # True realization from the conditional cov matrix
 true_realization = as.vector(rmultnorm(1, zhat, True_cond_cov))
 
-persp(t1, xstar,
-      matrix(true_realization[test_idx_kron], nrow = nt),
-      theta = 130-90, phi = 10,
-      xlab = 't',
-      ylab = 'x',
-      zlab ='f', 
-      zlim=c(-5,5)) -> res
-points(trans3d(plot_grid[,1], plot_grid[,2],
-               true_realization[test_idx_kron],
+
+persp(t1, x1, 
+      matrix(f, nrow = s),
+      theta = 130-90, 
+      phi = 10,
+      xlab = 't', ylab ='x', zlab = 'f',
+      zlim = c(-2.2, 2.4)) -> res
+
+points(trans3d(x[, 1], x[, 2], 
+               f,
                pmat = res),
        col = 'black',
        pch = 16,
        cex = 0.7)
+
+
+points(trans3d(plot_grid[,1], plot_grid[,2],
+               true_realization[test_idx_kron],
+               pmat = res),
+       col = 'red',
+       pch = 16,
+       cex = 0.7)
+
+legend("topright", legend = c("f", "realization"), col = c("black", "red"), pch=19)
 
 # for comparison to Nychka
 Lots_of_realizations = rmultnorm(nreals, zhat, True_cond_cov)
