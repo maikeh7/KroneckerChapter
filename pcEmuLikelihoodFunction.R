@@ -5,7 +5,7 @@ nc = 10        # number of computer model runs
 
 t1=seq(0,1,length=s)
 x1=seq(0,1,length=nc)
-x=expand.grid(t1,x1)
+#x=expand.grid(t1,x1)
 f = (x[,2]+1)*cos(pi*x[,1]) + .03*(exp(x[,2]))
 
 # function that carries out the optimization
