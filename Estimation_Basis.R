@@ -138,7 +138,8 @@ pre_process = function(fn, x, q, nu=1e-6){
 #' @param t1 original t train input locations
 #' @param params object returned from you get from ML_pcEMU
 #'
-#' @return a list containing means and covariance matrices for w*_j's and predictions at xnew
+#' @return a list containing means and covariance matrices for w*_j's and predictions at xnew and 
+#' the f matrix as well as the mean of f
 #' @export
 #'
 #' @examples
@@ -149,7 +150,6 @@ get_wstar_distr_preds = function(f, xnew, nc, q, x1,t1, params){
   fmat = matrix(f, ncol=nc)
   
   xdist_aug = as.matrix(dist( c(x1, xnew)) )
-  #xdist = as.matrix(dist(newx_grid))
   
   # subtract means of rows
   meanf = apply(fmat, 1, mean)
@@ -166,7 +166,6 @@ get_wstar_distr_preds = function(f, xnew, nc, q, x1,t1, params){
   wlist = list()
   
   preds = rep(0, length(t1)*nc_new)
-  #preds = matrix(nrow = 2, ncol = length(t1)*nc_new)
   for (i in 1:q){
     phi = params[[i]][1]
     sig2 = params[[i]][2]
@@ -186,7 +185,6 @@ get_wstar_distr_preds = function(f, xnew, nc, q, x1,t1, params){
     
     sig11_inv = solve(sigma11)
     
-    # check this stuff
     what_j = fsvd$v[ ,i] * sqrt(nc) 
     
     wmean = sigma21 %*% sig11_inv %*% what_j
@@ -195,13 +193,8 @@ get_wstar_distr_preds = function(f, xnew, nc, q, x1,t1, params){
     sublist = list(wmean = wmean, wcov = wcov)
     wlist[[i]] = sublist
     
-    #  Inc = diag(rep(1, length(xnew)))
-    #  Kbig1 = kronecker(Inc, K[, i])
-    #  #print(Kbig1 %*% wmean)
-    # preds = preds + Kbig1 %*% wmean
-    # preds[i, ] = Kbig1 %*% wmean
   }
   
-  return(list(wlist = wlist))
+  return(list(wlist = wlist, K = K, meanf = meanf, fmat0 = fmat0))
   
 }

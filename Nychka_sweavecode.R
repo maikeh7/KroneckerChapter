@@ -207,6 +207,7 @@ persp(t1, x1,
       phi = 10,
       xlab = 't', ylab = 'x', zlab = 'f', 
       zlim = c(-2.2, 2.4)) -> res
+i=1
 for (i in 1:nreals){
   points(trans3d(plot_grid_train[,1],
                  plot_grid_train[,2], 
@@ -306,14 +307,42 @@ f = (x_grid[, 2]+1)*cos(pi*x_grid[, 1]) + .03*(exp(x_grid[, 2]))
 # x1 = original x train locations
 # params = object you get from the basis estimation function
 
-test = get_wstar_distr_preds(f=f,xnew = xnew, nc=nc,q=2, x1=x1, t1=t1, params=params)
-test[[1]]$wmean
-w1 = as.vector( test[[1]][[1]]$wmean)
-w2 = as.vector(test[[1]][[2]]$wmean)
+w_stuff = get_wstar_distr_preds(f=f,xnew = xnew, nc=nc,q=2, x1=x1, t1=t1, params=params)
 
-wall = rbind(w1, w2)
-K %*% wall
+w1 = as.vector( w_stuff$wlist[[1]]$wmean)
+w2 = as.vector( w_stuff$wlist[[2]]$wmean)
+K = w_stuff$K
+meanf = w_stuff$meanf
 
+w_all = rbind(w1, w2)
+
+basis_preds = K %*% w_all
+basis_preds = as.vector(basis_preds + meanf)
+
+
+persp(t1, x1,
+      matrix(f, nrow = s),
+      theta = 130-90,
+      phi = 10,
+      xlab = 't', ylab = 'x', zlab = 'f', 
+      zlim = c(-2.4, 2.4)) -> res
+
+points(trans3d(x[, 1], x[, 2], 
+               f,
+               pmat = res),
+       col = 'black',
+       pch = 16,
+       cex = 0.7)
+
+points(trans3d(plot_grid[, 1],
+                 plot_grid[, 2], 
+                 basis_preds,
+                 pmat = res),
+         col = 'red',
+         pch = 16,
+         cex = 0.7)
+
+fmat0 + meanf
 # this is what we should be getting!!
 cond_mean[test_idx_kron]
 
@@ -324,8 +353,7 @@ get_wstar_distr_preds = function(f, xnew, nc, q, x1,t1, params){
   fmat = matrix(f, ncol=nc)
   
   xdist_aug = as.matrix(dist( c(x1, xnew)) )
-  #xdist = as.matrix(dist(newx_grid))
-  
+
   # subtract means of rows
   meanf = apply(fmat, 1, mean)
   fmat0 = fmat - meanf
@@ -341,7 +369,6 @@ get_wstar_distr_preds = function(f, xnew, nc, q, x1,t1, params){
   wlist = list()
   
   preds = rep(0, length(t1)*nc_new)
-  #preds = matrix(nrow = 2, ncol = length(t1)*nc_new)
   for (i in 1:q){
     phi = params[[i]][1]
     sig2 = params[[i]][2]
@@ -361,7 +388,6 @@ get_wstar_distr_preds = function(f, xnew, nc, q, x1,t1, params){
     
     sig11_inv = solve(sigma11)
     
-    # check this stuff
     what_j = fsvd$v[ ,i] * sqrt(nc) 
     
     wmean = sigma21 %*% sig11_inv %*% what_j
@@ -369,15 +395,10 @@ get_wstar_distr_preds = function(f, xnew, nc, q, x1,t1, params){
     wcov = sigma22 - sigma21 %*%  sig11_inv %*% sigma12
     sublist = list(wmean = wmean, wcov = wcov)
     wlist[[i]] = sublist
-    
-  #  Inc = diag(rep(1, length(xnew)))
-  #  Kbig1 = kronecker(Inc, K[, i])
-  #  #print(Kbig1 %*% wmean)
-   # preds = preds + Kbig1 %*% wmean
-   # preds[i, ] = Kbig1 %*% wmean
+
   }
   
-  return(list(wlist = wlist))
+  return(list(wlist = wlist, K = K, meanf = meanf, fmat0 = fmat0))
 
 }
 
