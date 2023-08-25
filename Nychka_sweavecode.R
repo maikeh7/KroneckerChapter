@@ -207,7 +207,7 @@ persp(t1, x1,
       phi = 10,
       xlab = 't', ylab = 'x', zlab = 'f', 
       zlim = c(-2.2, 2.4)) -> res
-i=1
+
 for (i in 1:nreals){
   points(trans3d(plot_grid_train[,1],
                  plot_grid_train[,2], 
@@ -311,6 +311,9 @@ w_stuff = get_wstar_distr_preds(f=f,xnew = xnew, nc=nc,q=2, x1=x1, t1=t1, params
 
 w1 = as.vector( w_stuff$wlist[[1]]$wmean)
 w2 = as.vector( w_stuff$wlist[[2]]$wmean)
+w1cov = w_stuff$wlist[[1]]$wcov
+w2cov = w_stuff$wlist[[2]]$wcov
+
 K = w_stuff$K
 meanf = w_stuff$meanf
 
@@ -318,6 +321,7 @@ w_all = rbind(w1, w2)
 
 basis_preds = K %*% w_all
 basis_preds = as.vector(basis_preds + meanf)
+
 
 
 persp(t1, x1,
@@ -345,6 +349,31 @@ points(trans3d(plot_grid[, 1],
 fmat0 + meanf
 # this is what we should be getting!!
 cond_mean[test_idx_kron]
+
+
+w1 = as.vector( w_stuff$wlist[[1]]$wmean)
+w2 = as.vector( w_stuff$wlist[[2]]$wmean)
+w1cov = w_stuff$wlist[[1]]$wcov
+w2cov = w_stuff$wlist[[2]]$wcov
+
+K = w_stuff$K
+meanf = w_stuff$meanf
+
+w_all = rbind(w1, w2)
+
+basis_preds = K %*% w_all
+basis_preds = as.vector(basis_preds + meanf)
+
+w1reals = rmultnorm(200, mu = w1, sigma = w1cov)
+w2reals = rmultnorm(200, mu = w2, sigma = w2cov)
+
+reals_matrix = matrix(nrow = 200, ncol = length(basis_preds))
+for (i in 1:200){
+  w_all = rbind(w1reals[i,], w2reals[i, ])
+  bpreds = as.vector(K %*% w_all + meanf)
+  reals_matrix[i, ] = bpreds
+}
+
 
 get_wstar_distr_preds = function(f, xnew, nc, q, x1,t1, params){
   

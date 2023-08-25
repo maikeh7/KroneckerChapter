@@ -106,7 +106,12 @@ pre_process = function(fn, x, q, nu=1e-6){
   
   # necessary to calculate second chunk of likelihood
   Inc = diag(rep(1, nc))
-  Kbig = cbind(kronecker(Inc, K[, 1]), kronecker(Inc, K[, 2]))
+  
+  klist = list()
+  for (i in 1:q){
+    klist[[i]] = kronecker(Inc, K[, i])
+  }
+  Kbigtest = do.call("cbind", klist)
   
   fvec = as.vector(fmat0)
   
